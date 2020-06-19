@@ -1,0 +1,106 @@
+version: '3.7'
+services:
+  config-server:
+    image: config-server:v1
+    ports:
+      - "8888:8888"
+    restart: always
+    networks:
+      - comunitas
+  servicio-eureka-server:
+    image: servicio-eureka-server:v1
+    ports:
+      - "8761:8761"
+    restart: always
+    networks:
+      - comunitas
+  microservicios-mysql8:
+    image: mysql:8
+    ports:
+      - "3306:3306"
+    restart: always
+    entrypoint: ['docker-entrypoint.sh', '--default-authentication-plugin=mysql_native_password']
+    networks:
+      - comunitas
+    environment: 
+      MYSQL_DATABASE: db_comunitas_cloud
+      MYSQL_ROOT_PASSWORD: sasa
+  microservicios-postgres12:
+    image: postgres:12-alpine
+    ports:
+      - "5432:5432"
+    restart: always
+    networks:
+      - comunitas
+    environment: 
+      POSTGRES_DB: db_comunitas_cloud
+      POSTGRES_PASSWORD: sasa
+  servicio-usuarios:
+    image: servicio-usuarios:v1
+    restart: always
+    networks:
+      - comunitas
+    depends_on: 
+      - config-server
+      - servicio-eureka-server
+      - microservicios-postgres12
+  servicio-tab-cargos:
+    image: servicio-tab-cargos:v1
+    restart: always
+    networks:
+      - comunitas
+    depends_on: 
+      - config-server
+      - servicio-eureka-server
+      - microservicios-postgres12
+  servicio-oauth:
+    image: servicio-oauth:v1
+    ports:
+      - "9100:9100"
+    restart: always
+    networks:
+      - comunitas
+    depends_on: 
+      - config-server
+      - servicio-eureka-server
+      - servicio-usuarios
+  servicio-zuul-server:
+    image: servicio-zuul-server:v1
+    ports:
+      - "8090:8090"
+    restart: always
+    networks:
+      - comunitas
+    depends_on: 
+      - config-server
+      - servicio-eureka-server
+      - servicio-usuarios
+      - servicio-oauth
+      - servicio-tab-cargos
+  microservicios-rabbitmq38:
+    image: rabbitmq:3.8-management-alpine
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    restart: always
+    networks:
+      - comunitas
+  zipkin-server:
+    image: zipkin-server:v1
+    ports:
+      - "9411:9411"
+    restart: always
+    networks:
+      - comunitas
+    depends_on: 
+      - microservicios-rabbitmq38
+      - microservicios-mysql8
+    environment: 
+      RABBIT_ADDRESSES: microservicios-rabbitmq38:5672
+      STORAGE_TYPE: mysql
+      MYSQL_USER: zipkin
+      MYSQL_PASS: zipkin
+      MYSQL_HOST: microservicios-mysql8
+networks:
+  comunitas:
+
